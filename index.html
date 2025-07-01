@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vulnissimo Scanner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-[#0f0f10] text-white min-h-screen">
+  <header class="px-8 py-4 flex justify-between items-center border-b border-[#1a1a1d] shadow">
+    <h1 class="text-2xl font-bold text-green-500">Vuln<span class="text-white">issimo</span></h1>
+    <button onclick="handleDownload()" class="bg-green-400 px-4 py-2 rounded text-black hover:bg-green-300">
+      Download Full Report
+    </button>
+  </header>
+
+  <main class="px-6 py-8 max-w-7xl mx-auto">
+    <section class="bg-[#1a1a1d] p-8 rounded-xl shadow border border-[#2a2a2e] mb-8">
+      <h2 class="text-2xl font-semibold mb-6">Start New Scan</h2>
+      <form class="flex flex-col md:flex-row gap-4 items-center" onsubmit="event.preventDefault(); startScan();">
+        <input 
+          type="url" 
+          id="targetInput"
+          placeholder="https://example.com"
+          class="flex-1 bg-[#2a2a2e] text-white border border-[#3a3a3e] px-4 py-3 rounded focus:outline-none focus:ring focus:ring-green-400 text-sm"
+          required
+        />
+        <button 
+          type="submit" 
+          class="bg-green-400 text-black px-6 py-3 text-sm font-semibold rounded hover:bg-green-300">
+          Start Scan
+        </button>
+      </form>
+      <p id="statusMessage" class="text-sm text-gray-400 mt-4 hidden">Initiating scan...</p>
+    </section>
+
+    <section class="bg-[#1a1a1d] p-6 rounded-xl shadow border border-[#2a2a2e] mb-8">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-semibold">Vulnerability Scan Result</h2>
+          <p class="text-sm text-gray-400">Target: <a class="scan-result-target text-green-400 underline" href="#"></a></p>
+          <p class="text-sm text-gray-400">Submitted from <span class="scan-result-country bg-blue-600 text-xs px-2 py-0.5 rounded ml-2"></span></p>
+          <p class="text-sm text-gray-400">Scan mode: <span class="italic">Passive (non-intrusive)</span></p>
+        </div>
+      </div>
+
+      <div class="bg-[#2a2a2e] rounded p-4 border border-[#3a3a3e] mb-6">
+        <h3 class="text-sm font-semibold mb-2">Screenshot</h3>
+        <div class="screenshot-block bg-gray-700 h-28 flex items-center justify-center rounded text-gray-300 italic">Awaiting screenshot...</div>
+      </div>
+
+      <div class="bg-[#2a2a2e] rounded p-4 border border-[#3a3a3e] mb-6">
+        <h3 class="text-sm font-semibold mb-2">Web Technologies</h3>
+        <ul class="tech-list text-sm text-gray-300 space-y-1"></ul>
+      </div>
+    </section>
+
+    <section class="grid md:grid-cols-2 gap-6 mb-8">
+      <div class="bg-[#1a1a1d] p-6 rounded-xl border border-[#2e2e32]">
+        <h3 class="text-lg font-semibold mb-4">Web Application Vulnerabilities</h3>
+        <ul class="vuln-list text-sm text-gray-300 space-y-2"></ul>
+      </div>
+      <div class="bg-[#1a1a1d] p-6 rounded-xl border border-[#2e2e32]">
+        <h3 class="text-lg font-semibold mb-4">Infrastructure Vulnerabilities</h3>
+        <ul class="infra-list text-sm text-gray-300 space-y-2"></ul>
+      </div>
+    </section>
+
+    <section class="bg-[#1a1a1d] p-6 rounded-xl border border-[#2e2e32]">
+      <h3 class="text-lg font-semibold mb-4">Open Ports</h3>
+      <ul class="ports-list text-sm text-gray-300 space-y-1"></ul>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
