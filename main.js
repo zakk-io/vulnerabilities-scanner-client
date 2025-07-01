@@ -14,7 +14,7 @@ async function startScan() {
     output.textContent = 'Starting scan...';
     output.classList.remove('hidden');
 
-    const scanResponse = await fetch('http://localhost:3000/proxy/scans', {
+    const scanResponse = await fetch('https://vulnerabilities-scanner-server.onrender.com/proxy/scans', {
       method: 'POST',
       headers: {
         'Accept': 'application/json',
@@ -29,7 +29,7 @@ async function startScan() {
     const pollResult = async (id, interval = 3000, timeout = 300000) => {
       const startTime = Date.now();
       while (Date.now() - startTime < timeout) {
-        const res = await fetch(`http://localhost:3000/proxy/scans/${id}`);
+        const res = await fetch(`https://vulnerabilities-scanner-server.onrender.com/scans/${id}`);
         const data = await res.json();
         const progress = data.scan_info?.progress || 0;
         output.textContent = `Scan in progress... (${progress}%)`;
