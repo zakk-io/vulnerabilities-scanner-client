@@ -29,7 +29,7 @@ async function startScan() {
     const pollResult = async (id, interval = 3000, timeout = 300000) => {
       const startTime = Date.now();
       while (Date.now() - startTime < timeout) {
-        const res = await fetch(`https://vulnerabilities-scanner-server.onrender.com/scans/${id}`);
+        const res = await fetch(`https://vulnerabilities-scanner-server.onrender.com/proxy/scans/${id}`);
         const data = await res.json();
         const progress = data.scan_info?.progress || 0;
         output.textContent = `Scan in progress... (${progress}%)`;
