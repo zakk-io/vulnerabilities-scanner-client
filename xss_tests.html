@@ -178,13 +178,6 @@ async function runScan() {
           <div><span class="text-slate-400">KnoxSS Error:</span> ${err}</div>
           <div class="sm:col-span-2"><span class="text-slate-400">Target:</span> <span class="break-all">${escapeHtml(target || '—')}</span></div>
           <div class="sm:col-span-2"><span class="text-slate-400">PoC:</span> <span class="break-all">${escapeHtml(poc || '—')}</span></div>
-          <div class="sm:col-span-2"><span class="text-slate-400">Notes:</span> <span>${notes}</span></div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          ${poc ? `<a class="text-xs underline text-emerald-300" href="${poc}" target="_blank" rel="noopener">Open PoC</a>` : ''}
-          ${target ? `<a class="text-xs underline text-sky-300" href="${target}" target="_blank" rel="noopener">Open Target</a>` : ''}
-          ${poc ? `<button class="text-xs underline text-slate-300" onclick="copyText('${jsEscape(poc)}')">Copy PoC</button>` : ''}
-          ${target ? `<button class="text-xs underline text-slate-300" onclick="copyText('${jsEscape(target)}')">Copy Target</button>` : ''}
         </div>
       `;
       els.hitsWrap.appendChild(card);
