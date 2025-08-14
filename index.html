@@ -13,13 +13,17 @@
 <body class="bg-[#0f0f10] text-white min-h-screen">
   <header class="px-8 py-4 flex justify-between items-center border-b border-[#1a1a1d] shadow">
     <h1 class="text-2xl font-bold text-green-500">Vuln<span class="text-white">issimo</span></h1>
+    <nav class="flex items-center gap-6">
+      <a href="#start-scan" class="hover:text-green-400 text-sm font-medium">Start Scan</a>
+      <a href="xss_tests.html" class="hover:text-green-400 text-sm font-medium">XSS Tests</a>
+    </nav>
     <button onclick="handleDownload()" class="bg-green-400 px-4 py-2 rounded text-black hover:bg-green-300">
       Download Full Report
     </button>
   </header>
 
   <main class="px-6 py-8 max-w-7xl mx-auto">
-    <section class="bg-[#1a1a1d] p-8 rounded-xl shadow border border-[#2a2a2e] mb-8">
+    <section id="start-scan" class="bg-[#1a1a1d] p-8 rounded-xl shadow border border-[#2a2a2e] mb-8">
       <h2 class="text-2xl font-semibold mb-6">Start New Scan</h2>
       <form class="flex flex-col md:flex-row gap-4 items-center" onsubmit="event.preventDefault(); startScan();">
         <input 
@@ -38,7 +42,7 @@
       <p id="statusMessage" class="text-sm text-gray-400 mt-4 hidden">Initiating scan...</p>
     </section>
 
-    <section class="bg-[#1a1a1d] p-6 rounded-xl shadow border border-[#2a2a2e] mb-8">
+    <section id="vuln-results" class="bg-[#1a1a1d] p-6 rounded-xl shadow border border-[#2a2a2e] mb-8">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <h2 class="text-xl font-semibold">Vulnerability Scan Result</h2>
@@ -74,6 +78,7 @@
       <h3 class="text-lg font-semibold mb-4">Open Ports</h3>
       <ul class="ports-list text-sm text-gray-300 space-y-1"></ul>
     </section>
+
   </main>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
