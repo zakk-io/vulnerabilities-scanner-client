@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mini Chat (Gemini with Markdown)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Markdown parser -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+  <!-- Chat area -->
+  <main id="chat" class="max-w-4xl mx-auto w-full px-4 py-4 space-y-4 grow overflow-y-auto">
+    <div class="flex items-start gap-3">
+      <div class="shrink-0 size-9 rounded-full bg-indigo-600 grid place-items-center">🤖</div>
+      <div class="max-w-[85%] md:max-w-[70%] rounded-2xl rounded-tl-sm bg-slate-900 border border-slate-800 p-3">
+        <p class="text-sm leading-6 text-slate-200">
+          Hi! Ask me anything, I’m using Gemini 2.0 Flash.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Composer -->
+  <footer class="border-t border-slate-800 bg-slate-900/70 backdrop-blur sticky bottom-0">
+    <div class="max-w-4xl mx-auto px-4 py-3">
+      <div class="rounded-2xl border border-slate-700 bg-slate-800/80">
+        <textarea id="input" rows="1" placeholder="Send a message… (Enter to send, Shift+Enter for new line)"
+                  class="w-full resize-none bg-transparent outline-none px-4 py-3 text-slate-100 placeholder:text-slate-500"></textarea>
+        <div class="flex items-center justify-between px-3 pb-2">
+          <small id="hint" class="text-slate-400"></small>
+          <div class="flex items-center gap-2">
+            <button id="clearBtn" class="text-sm rounded-xl px-3 py-1.5 border border-slate-700 hover:bg-slate-800">Clear</button>
+            <button id="sendBtn" class="text-sm rounded-xl px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    const GEMINI_KEY = "AIzaSyAzalKDSJkVTzT6RU-x6E5Wy4NX2JdF93s";
+
+    const chatEl   = document.getElementById('chat');
+    const inputEl  = document.getElementById('input');
+    const sendBtn  = document.getElementById('sendBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const hintEl   = document.getElementById('hint');
+
+    clearBtn.addEventListener('click', () => {
+      chatEl.querySelectorAll('.msg').forEach(n => n.remove());
+      flash('Chat cleared.');
+    });
+
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+    sendBtn.addEventListener('click', sendMessage);
+
+    function flash(text) {
+      hintEl.textContent = text;
+      setTimeout(() => (hintEl.textContent = ''), 2000);
+    }
+
+    function addBubble({ role, text, pending=false, markdown=false }) {
+      const wrap = document.createElement('div');
+      wrap.className = 'msg flex items-start gap-3';
+      const isUser = role === 'user';
+
+      const avatar = document.createElement('div');
+      avatar.className = `shrink-0 size-9 rounded-full grid place-items-center ${isUser ? 'bg-emerald-600' : 'bg-indigo-600'}`;
+      avatar.textContent = isUser ? '🧑' : '🤖';
+
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[85%] md:max-w-[70%] rounded-2xl p-3 border ${isUser
+        ? 'rounded-tr-sm bg-emerald-500/10 border-emerald-700'
+        : 'rounded-tl-sm bg-slate-900 border-slate-800'}`;
+      
+      if (markdown) {
+        bubble.innerHTML = `<div class="prose prose-invert max-w-none">${marked.parse(text)}</div>`;
+      } else {
+        bubble.innerHTML = `<p class="whitespace-pre-wrap text-sm leading-6">${escapeHtml(text)}</p>`;
+      }
+
+      wrap.appendChild(avatar);
+      wrap.appendChild(bubble);
+
+      if (pending) {
+        const dots = document.createElement('div');
+        dots.className = 'mt-2 flex gap-1';
+        dots.innerHTML = `
+          <span class="size-2 rounded-full bg-slate-500 animate-bounce"></span>
+          <span class="size-2 rounded-full bg-slate-500 animate-bounce [animation-delay:120ms]"></span>
+          <span class="size-2 rounded-full bg-slate-500 animate-bounce [animation-delay:240ms]"></span>
+        `;
+        bubble.appendChild(dots);
+        wrap.dataset.pending = '1';
+      }
+
+      chatEl.appendChild(wrap);
+      chatEl.scrollTop = chatEl.scrollHeight;
+      return wrap;
+    }
+
+    function escapeHtml(s) {
+      return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    async function sendMessage() {
+      const text = inputEl.value.trim();
+      if (!text)   { return; }
+
+      inputEl.value = '';
+      sendBtn.disabled = true;
+
+      addBubble({ role: 'user', text });
+      const pending = addBubble({ role: 'assistant', text: 'Thinking…', pending: true });
+
+      try {
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': GEMINI_KEY
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text }] }]
+          })
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
+
+        const data = await res.json();
+        const candidate = data?.candidates?.[0];
+        const out = candidate?.content?.parts?.map(p => p.text).join('\n') || '(no output)';
+        renderAssistant(pending, out, true);
+      } catch (err) {
+        renderAssistant(pending, `❌ Error: ${err.message}`, false);
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    function renderAssistant(pendingWrap, text, markdown=false) {
+      const bubble = pendingWrap.querySelector('div:nth-child(2)');
+      if (markdown) {
+        bubble.innerHTML = `<div class="prose prose-invert max-w-none">${marked.parse(text)}</div>`;
+      } else {
+        bubble.innerHTML = `<p class="whitespace-pre-wrap text-sm leading-6">${escapeHtml(text)}</p>`;
+      }
+      pendingWrap.removeAttribute('data-pending');
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+  </script>
+</body>
+</html>
