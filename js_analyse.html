@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>JS Secret Scanner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* simple ring for focus */
+    .focus-ring:focus { outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.5); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <div class="max-w-6xl mx-auto p-6">
+    <header class="mb-6">
+      <h1 class="text-3xl font-bold">JS Secret Scanner</h1>
+      <p class="text-slate-300 mt-1">Scan a site, list its JavaScript files with leaked secrets, and visualize results.</p>
+    </header>
+
+    <!-- Controls -->
+    <section class="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 shadow">
+      <form id="scanForm" class="grid md:grid-cols-12 gap-4 items-end">
+        <div class="md:col-span-8">
+          <label class="block text-sm text-slate-300 mb-1" for="url">Target URL</label>
+          <input id="url" type="url" required class="w-full focus-ring rounded-xl bg-slate-900 border border-slate-700 px-4 py-2 mono" placeholder="https://example.com" value="https://dotv3n.github.io/javascriptsecret/" />
+        </div>
+        <div class="md:col-span-2 flex items-center gap-2">
+          <input id="sameOriginOnly" type="checkbox" class="h-4 w-4" />
+          <label for="sameOriginOnly" class="text-sm">Same-origin only</label>
+        </div>
+        <div class="md:col-span-2 flex items-center gap-2">
+          <input id="ignoreRobots" type="checkbox" class="h-4 w-4" checked />
+          <label for="ignoreRobots" class="text-sm">Ignore robots.txt</label>
+        </div>
+        <div class="md:col-span-12 flex gap-3">
+          <button id="scanBtn" type="submit" class="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition shadow">Scan</button>
+          <button id="exportBtn" type="button" class="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 transition shadow disabled:opacity-50" disabled>Export JSON</button>
+          <span id="status" class="text-sm text-slate-300 hidden"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Summary -->
+    <section id="summary" class="mt-6 hidden">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+          <div class="text-slate-400 text-sm">Files with leaks</div>
+          <div id="filesCount" class="text-2xl font-semibold">0</div>
+        </div>
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+          <div class="text-slate-400 text-sm">Total findings</div>
+          <div id="findingsCount" class="text-2xl font-semibold">0</div>
+        </div>
+        <div class="bg-slate-800/60 border border-slate-700 rounded-2xl p-4">
+          <div class="text-slate-400 text-sm">Last scan</div>
+          <div id="lastScan" class="text-2xl font-semibold">–</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="results" class="mt-6 space-y-4"></section>
+
+    <!-- Footer note -->
+    <p class="mt-8 text-xs text-slate-500">If you hit a CORS error, enable CORS on your API server (e.g., Flask-CORS) or use a same-origin UI.</p>
+  </div>
+
+  <template id="fileCardTpl">
+    <div class="bg-slate-800/60 border border-slate-700 rounded-2xl overflow-hidden">
+      <div class="px-5 py-4 flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="truncate mono text-sm" data-file-url></div>
+          <div class="text-xs text-slate-400 mt-1">
+            <span class="text-slate-300">Total findings:</span>
+            <span class="font-semibold" data-hit-count></span>
+          </div>
+          <!-- Collapsible keyword=value chips -->
+          <div class="mt-2 hidden" data-pairs></div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" data-toggle-pairs>Pairs</button>
+          <button class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" data-toggle>Details</button>
+          <button class="px-3 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs" data-copy-file>Copy URL</button>
+        </div>
+      </div>
+      <div class="px-5 pb-5 hidden" data-body>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-300 border-b border-slate-700">
+                <th class="py-2 pr-4">#</th>
+                <th class="py-2 pr-4">Keyword</th>
+                <th class="py-2 pr-4">Operator</th>
+                <th class="py-2 pr-4">Value</th>
+                <th class="py-2 pr-4">Context</th>
+                <th class="py-2 pr-4">Copy</th>
+              </tr>
+            </thead>
+            <tbody data-rows></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <script>
+    const API_ENDPOINT = 'https://js-scanner.onrender.com/scan';
+
+    const form = document.getElementById('scanForm');
+    const urlInput = document.getElementById('url');
+    const sameOriginOnly = document.getElementById('sameOriginOnly');
+    const ignoreRobots = document.getElementById('ignoreRobots');
+    const statusEl = document.getElementById('status');
+    const resultsEl = document.getElementById('results');
+    const summaryEl = document.getElementById('summary');
+    const filesCountEl = document.getElementById('filesCount');
+    const findingsCountEl = document.getElementById('findingsCount');
+    const lastScanEl = document.getElementById('lastScan');
+    const exportBtn = document.getElementById('exportBtn');
+
+    let lastRaw = null;
+
+    function setStatus(msg, busy=false) {
+      statusEl.textContent = msg || '';
+      statusEl.classList.toggle('hidden', !msg);
+      document.getElementById('scanBtn').disabled = busy;
+      exportBtn.disabled = !lastRaw;
+    }
+
+    function renderResults(map) {
+      resultsEl.innerHTML = '';
+      const files = Object.keys(map);
+      let totalFindings = 0;
+
+      if (files.length === 0) {
+        resultsEl.innerHTML = `
+          <div class="bg-emerald-900/20 border border-emerald-700 text-emerald-200 rounded-2xl p-4">
+            No leaks found for this scan.
+          </div>`;
+      }
+
+      files.forEach((fileUrl) => {
+        const hits = map[fileUrl] || [];
+        totalFindings += hits.length;
+        const tpl = document.getElementById('fileCardTpl').content.cloneNode(true);
+        
+        // Header fields
+        tpl.querySelector('[data-file-url]').textContent = fileUrl;
+        tpl.querySelector('[data-hit-count]').textContent = `${hits.length}`;
+
+        // Pairs (keyword,value) — collapsible
+        const pairsWrap = tpl.querySelector('[data-pairs]');
+        if (hits.length > 0) {
+          hits.forEach((h) => {
+            const key = (h.keyword || '').toString();
+            const val = (h.value || '').toString();
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'inline-flex items-center text-xs bg-slate-700 hover:bg-slate-600 rounded-lg px-2 py-1 mr-2 mb-2 mono';
+            chip.title = `${key} = ${val}\nClick to copy value`;
+            chip.innerHTML = `
+              <span class="text-slate-300 mr-1">${escapeHTML(key)}</span>
+              <span class="opacity-70">=</span>
+              <span class="ml-1 break-all text-slate-100">${escapeHTML(val)}</span>`;
+            chip.addEventListener('click', () => copyText(val));
+            pairsWrap.appendChild(chip);
+          });
+        } else {
+          pairsWrap.innerHTML = '<span class="text-sm text-slate-400">No pairs</span>';
+        }
+
+        // Details table (expandable)
+        const body = tpl.querySelector('[data-body]');
+        const rows = tpl.querySelector('[data-rows]');
+        hits.forEach((h, i) => {
+          const tr = document.createElement('tr');
+          tr.className = 'border-b border-slate-800/60';
+          tr.innerHTML = `
+            <td class="py-2 pr-4 text-slate-400">${i+1}</td>
+            <td class="py-2 pr-4 mono">${escapeHTML(h.keyword||'')}</td>
+            <td class="py-2 pr-4 mono">${escapeHTML(h.operator||'')}</td>
+            <td class="py-2 pr-4 mono break-all">${escapeHTML(h.value||'')}</td>
+            <td class="py-2 pr-4 mono text-slate-300 max-w-[36rem] overflow-hidden">${escapeHTML(h.context||'')}</td>
+            <td class="py-2 pr-4"><button class="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600" data-copy-value>Copy</button></td>
+          `;
+          rows.appendChild(tr);
+        });
+
+        // Interaction
+        tpl.querySelector('[data-toggle]').addEventListener('click', () => body.classList.toggle('hidden'));
+        tpl.querySelector('[data-toggle-pairs]').addEventListener('click', () => pairsWrap.classList.toggle('hidden'));
+        tpl.querySelector('[data-copy-file]').addEventListener('click', () => copyText(fileUrl));
+        tpl.querySelectorAll('[data-copy-value]').forEach((btn, i) => {
+          btn.addEventListener('click', () => copyText(hits[i].value || ''));
+        });
+
+        resultsEl.appendChild(tpl);
+      });
+
+      filesCountEl.textContent = files.length;
+      findingsCountEl.textContent = totalFindings;
+      lastScanEl.textContent = new Date().toLocaleString();
+      summaryEl.classList.remove('hidden');
+      exportBtn.disabled = !lastRaw;
+    }
+
+    function escapeHTML(s) {
+      return String(s).replace(/[&<>"']/g, c => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[c]));
+    }
+
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus('Copied to clipboard');
+        setTimeout(() => setStatus(''), 1000);
+      } catch (e) {
+        console.warn('Copy failed', e);
+      }
+    }
+
+    function exportJSON() {
+      if (!lastRaw) return;
+      const blob = new Blob([JSON.stringify(lastRaw, null, 2)], {type: 'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'scan-results.json';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    }
+
+    exportBtn.addEventListener('click', exportJSON);
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      lastRaw = null;
+      setStatus('Scanning…', true);
+      resultsEl.innerHTML = '';
+
+      const payload = {
+        url: urlInput.value.trim(),
+        same_origin_only: !!sameOriginOnly.checked,
+        ignore_robots: !!ignoreRobots.checked
+      };
+
+      try {
+        const res = await fetch(API_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(`HTTP ${res.status}: ${t || res.statusText}`);
+        }
+
+        const data = await res.json();
+        lastRaw = data;
+        setStatus('Scan complete');
+        renderResults(data);
+      } catch (err) {
+        console.error(err);
+        setStatus('Error: ' + err.message);
+        resultsEl.innerHTML = `
+          <div class="bg-rose-900/30 border border-rose-800 text-rose-100 rounded-2xl p-4">
+            <div class="font-semibold mb-1">Request failed</div>
+            <div class="text-sm">${escapeHTML(err.message)}</div>
+            <div class="text-xs mt-2 text-rose-200/80">If this is a CORS error, enable CORS on the API or host this page from the same origin.</div>
+          </div>`;
+      } finally {
+        setTimeout(() => setStatus(''), 1500);
+        document.getElementById('scanBtn').disabled = false;
+        exportBtn.disabled = !lastRaw;
+      }
+    });
+  </script>
+</body>
+</html>
